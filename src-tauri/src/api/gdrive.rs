@@ -4,6 +4,8 @@ use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::sleep;
 
+const DEFAULT_RCLONE_CONFIG_NAME: &str = "gdrive_unofficial_neuro_kar";
+
 #[tauri::command]
 pub async fn get_gdrive_remotes() -> Result<Vec<String>, String> {
     let client = rclone::get_sdk_client().await?;
@@ -36,6 +38,7 @@ pub async fn download_gdrive(
     source: String,
     destination: String,
     remote_config: Option<String>,
+    create_subfolder: bool,
 ) -> Result<String, String> {
     let client = rclone::get_sdk_client().await?;
 
@@ -72,30 +75,27 @@ pub async fn download_gdrive(
         let auth_output = String::from_utf8_lossy(&output.stdout);
         let token = extract_json(&auth_output).ok_or("Failed to extract token from auth output")?;
 
-        let name = "temp_neuro_gdrive";
-
-        // Create remote via SDK
-        // Note: SDK config_create takes parameters as a string (JSON)
         let params = serde_json::json!({
             "token": token
         });
 
         client
-            .config_create(None, None, name, None, &params.to_string(), "drive")
+            .config_create(Some(true), None, DEFAULT_RCLONE_CONFIG_NAME, None, &params.to_string(), "drive")
             .await
             .map_err(|e| format!("Failed to create config context: {}", e))?;
 
-        name.to_string()
+        DEFAULT_RCLONE_CONFIG_NAME.to_string()
     };
 
     // 3. Construct Source and Dest Fs
-    // Use on-the-fly config override to set the root_folder_id
     let src_fs = format!("{},root_folder_id={}:", remote_name, root_id);
-    // Ensure destination is not empty?
-    let dst_fs = destination;
+    let mut dst_path = std::path::PathBuf::from(destination);
+    if create_subfolder {
+        dst_path.push("Unofficial-Neuro-Karaoke-Archive");
+    }
+    let dst_fs = dst_path.to_string_lossy().to_string();
 
-    // 4. Run Copy via SDK (Async Mode)
-    // Calling sync/copy
+    // 4. Copy
     let mw = client
         .sync_copy(Some(true), None, None, None, None, &dst_fs, &src_fs)
         .await
@@ -106,18 +106,33 @@ pub async fn download_gdrive(
 
     // Poll for completion
     loop {
-        let response = client
+        let response_result = client
             .client()
             .post(format!("{}/job/status", client.baseurl()))
             .json(&serde_json::json!({
                 "jobid": jobid
             }))
             .send()
-            .await
-            .map_err(|e| format!("Failed to check job status: {}", e))?;
+            .await;
+
+        let response = match response_result {
+            Ok(res) => res,
+            Err(e) => {
+                let err_str = e.to_string();
+                if err_str.contains("error sending request")
+                    || err_str.contains("connection refused")
+                {
+                    return Ok("Download cancelled (server stopped)".to_string());
+                }
+                return Err(format!("Failed to check job status: {}", e));
+            }
+        };
 
         if !response.status().is_success() {
             let err_text = response.text().await.unwrap_or_default();
+            if err_text.contains("job not found") {
+                return Ok("Download cancelled".to_string());
+            }
             return Err(format!("Job status check failed: {}", err_text));
         }
 

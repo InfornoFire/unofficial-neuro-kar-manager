@@ -115,13 +115,24 @@ pub async fn get_sdk_client() -> Result<Client, String> {
 #[tauri::command]
 pub async fn get_stats() -> Result<rclone_sdk::types::CoreStatsResponse, String> {
     let client = get_sdk_client().await?;
-    // core/stats
     let response = client
         .core_stats(None, None, None, None)
         .await
         .map_err(|e| format!("Failed to fetch stats: {}", e))?;
 
     Ok(response.into_inner())
+}
+
+#[tauri::command]
+pub async fn stop_rc_server() -> Result<(), String> {
+    if is_server_running().await {
+        let client = Client::new(RC_URL);
+        client
+            .core_quit(None, None, None)
+            .await
+            .map_err(|e| format!("Failed to stop rclone: {}", e))?;
+    }
+    Ok(())
 }
 
 /// Downloads rclone from the official website.

@@ -1,47 +1,48 @@
 import { Download, Home } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { Link, useLocation } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import DownloadPage from "@/pages/Download";
+import HomePage from "@/pages/HomePage";
 
 export default function Layout() {
+  const location = useLocation();
+
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
       {/* Sidebar */}
       <aside className="w-32 border-r border-border bg-sidebar text-sidebar-foreground flex flex-col">
         <nav className="flex-1 p-2 space-y-2 overflow-y-auto">
-          <NavLink
-            to="/home"
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "",
-              )
-            }
+          <Button
+            variant={location.pathname === "/home" ? "secondary" : "ghost"}
+            className="w-full justify-start gap-2 px-3"
+            asChild
           >
-            <Home className="h-4 w-4" />
-            Home
-          </NavLink>
-          <NavLink
-            to="/download"
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "",
-              )
-            }
+            <Link to="/home">
+              <Home className="h-4 w-4" />
+              Home
+            </Link>
+          </Button>
+          <Button
+            variant={location.pathname === "/download" ? "secondary" : "ghost"}
+            className="w-full justify-start gap-2 px-3"
+            asChild
           >
-            <Download className="h-4 w-4" />
-            Download
-          </NavLink>
+            <Link to="/download">
+              <Download className="h-4 w-4" />
+              Download
+            </Link>
+          </Button>
         </nav>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto w-full">
-        <Outlet />
+      <main className="flex-1 overflow-y-auto w-full relative">
+        <div style={{ display: location.pathname === "/home" ? "block" : "none" }}>
+          <HomePage />
+        </div>
+        <div style={{ display: location.pathname === "/download" ? "block" : "none" }}>
+          <DownloadPage />
+        </div>
       </main>
     </div>
   );

@@ -1,4 +1,3 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 pub mod api;
 
 #[tauri::command]
@@ -13,11 +12,6 @@ async fn check_rclone() -> bool {
     api::rclone::is_rclone_installed().await.is_some()
 }
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -25,13 +19,20 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
             download_rclone,
             check_rclone,
             api::gdrive::get_gdrive_remotes,
             api::gdrive::download_gdrive,
-            api::rclone::get_stats
+            api::rclone::get_stats,
+            api::rclone::stop_rc_server
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error building tauri application")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                let _ = tauri::async_runtime::block_on(async {
+                    let _ = api::rclone::stop_rc_server().await;
+                });
+            }
+        });
 }

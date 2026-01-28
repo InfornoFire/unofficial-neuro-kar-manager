@@ -1,17 +1,39 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { DownloadCloud, Folder, Save, Settings } from "lucide-react";
+import { DownloadCloud, Folder, RefreshCw, Save, Settings } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { TransferStatus } from "@/components/TransferStatus";
+import { DownloadsButton } from "@/components/DownloadsButton";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 const DEFAULT_GDRIVE_SOURCE = "1B1VaWp-mCKk15_7XpFnImsTdBJPOGx7a";
+const DEFAULT_RCLONE_CONFIG_NAME = "gdrive_unofficial_neuro_kar";
 
 export default function DownloadPage() {
   const [source, setSource] = useState(DEFAULT_GDRIVE_SOURCE);
   const [destination, setDestination] = useState("");
   const [remotes, setRemotes] = useState<string[]>([]);
-  const [selectedRemote, setSelectedRemote] = useState<string | null>(null);
+  const [selectedRemote, setSelectedRemote] = useState<string | null>(DEFAULT_RCLONE_CONFIG_NAME);
+  const [useSubfolder, setUseSubfolder] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [status, setStatus] = useState("");
   const [log, setLog] = useState("");
 
@@ -19,8 +41,10 @@ export default function DownloadPage() {
     try {
       const availableRemotes = await invoke<string[]>("get_gdrive_remotes");
       setRemotes(availableRemotes);
-      if (availableRemotes.length > 0) {
-        setSelectedRemote(availableRemotes[0]);
+      if (availableRemotes.includes(DEFAULT_RCLONE_CONFIG_NAME)) {
+        setSelectedRemote(DEFAULT_RCLONE_CONFIG_NAME);
+      } else {
+        setSelectedRemote(null);
       }
     } catch (err) {
       console.error("Failed to fetch remotes", err);
@@ -38,11 +62,26 @@ export default function DownloadPage() {
         directory: true,
         multiple: false,
       });
-      if (selected && typeof selected === "string") {
+      if (selected === null) return;
+      if (typeof selected === "string") {
         setDestination(selected);
       }
     } catch (err) {
       console.error("Failed to select destination", err);
+    }
+  };
+
+  const handleCancel = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (cancelling) return;
+    setCancelling(true);
+    try {
+      setLog((prev) => `${prev}\nRequesting cancellation...`);
+      await invoke("stop_rc_server");
+    } catch (err) {
+      console.error("Failed to stop rclone", err);
+      setLog((prev) => `${prev}\nFailed to stop rclone: ${err}`);
+      setCancelling(false);
     }
   };
 
@@ -64,6 +103,7 @@ export default function DownloadPage() {
         source,
         destination,
         remoteConfig: selectedRemote || null,
+        createSubfolder: useSubfolder,
       });
       setStatus("Download completed successfully.");
       setLog((prev) => `${prev}\n${output}`);
@@ -73,129 +113,164 @@ export default function DownloadPage() {
       setLog((prev) => `${prev}\nError: ${error}`);
     } finally {
       setLoading(false);
+      setCancelling(false);
     }
   };
 
   return (
     <div className="container mx-auto p-6 max-w-3xl space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <DownloadCloud className="h-8 w-8" />
-          GDrive Download
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Download content directly from Google Drive using rclone.
-        </p>
-      </div>
-
-      <form
-        onSubmit={handleDownload}
-        className="space-y-6 bg-card p-6 rounded-lg border border-border"
-      >
-        {/* Source Input */}
-        <div className="space-y-2">
-          <label
-            htmlFor="source"
-            className="text-sm font-medium flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            GDrive Source (Link or ID)
-          </label>
-          <input
-            id="source"
-            type="text"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            placeholder="e.g. 1AbCdEfGhIjK..."
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-
-        {/* Destination Input */}
-        <div className="space-y-2">
-          <label
-            htmlFor="destination"
-            className="text-sm font-medium flex items-center gap-2"
-          >
-            <Save className="h-4 w-4" />
-            Destination (Local Folder Path)
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="destination"
-              type="text"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="/home/user/Downloads/..."
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              disabled={loading}
-            />
-            <button
-              type="button"
-              onClick={handleSelectDestination}
-              className="px-3 py-2 border border-input rounded-md hover:bg-accent hover:text-accent-foreground"
-              disabled={loading}
-              title="Select Folder"
-            >
-              <Folder className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Remote Selection */}
-        <div className="space-y-2">
-          <label
-            htmlFor="remote-config"
-            className="text-sm font-medium flex items-center gap-2"
-          >
-            <Folder className="h-4 w-4" />
-            Rclone Remote Config
-          </label>
-          <div className="flex gap-2">
-            <select
-              id="remote-config"
-              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              value={selectedRemote || ""}
-              onChange={(e) => setSelectedRemote(e.target.value || null)}
-              disabled={loading}
-            >
-              <option value="">No Config (Auto-Authorize)</option>
-              {remotes.map((remote) => (
-                <option key={remote} value={remote}>
-                  {remote}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={fetchRemotes}
-              className="px-3 py-2 border border-input rounded-md hover:bg-accent hover:text-accent-foreground"
-              disabled={loading}
-              title="Refresh Remotes"
-            >
-              ↻
-            </button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            If "No Config" is selected, a one-time authorization window will
-            open in your browser.
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <DownloadCloud className="h-8 w-8" />
+            GDrive Download
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Download content directly from Google Drive using rclone.
           </p>
         </div>
+        <DownloadsButton />
+      </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full"
-        >
-          {loading ? "Downloading..." : "Start Download"}
-        </button>
-      </form>
+      <Card>
+        <form onSubmit={handleDownload}>
+          <CardContent className="space-y-6 pt-6">
+            {/* Source Input */}
+            <div className="space-y-2">
+              <Label htmlFor="source" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                GDrive Source (Link or ID)
+              </Label>
+              <Input
+                id="source"
+                type="text"
+                placeholder="e.g. 1AbCdEfGhIjK..."
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            {/* Destination Input */}
+            <div className="space-y-2">
+              <Label htmlFor="destination" className="flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Destination (Local Folder Path)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="destination"
+                  type="text"
+                  placeholder="/home/user/Downloads/..."
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  disabled={loading}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleSelectDestination}
+                  disabled={loading}
+                  title="Select Folder"
+                >
+                  <Folder className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center space-x-2 pt-1">
+                <Checkbox
+                  id="useSubfolder"
+                  checked={useSubfolder}
+                  onCheckedChange={(checked) =>
+                    setUseSubfolder(checked as boolean)
+                  }
+                  disabled={loading}
+                />
+                <Label
+                  htmlFor="useSubfolder"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  title="Appends '/Unofficial-Neuro-Karaoke-Archive' to the destination path."
+                >
+                  Place items in subfolder (/Unofficial-Neuro-Karaoke-Archive)
+                </Label>
+              </div>
+            </div>
+
+            {/* Remote Selection */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="remote-config"
+                className="flex items-center gap-2"
+              >
+                <Folder className="h-4 w-4" />
+                Rclone Remote Config
+              </Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select
+                    key={remotes.length}
+                    value={selectedRemote || "new_config"}
+                    onValueChange={(val) =>
+                      setSelectedRemote(val === "new_config" ? null : val)
+                    }
+                    disabled={loading}
+                  >
+                    <SelectTrigger id="remote-config">
+                      <SelectValue placeholder="Select a remote" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new_config">
+                        Generate New Config
+                      </SelectItem>
+                      {remotes.map((remote) => (
+                        <SelectItem key={remote} value={remote}>
+                          {remote}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={fetchRemotes}
+                  disabled={loading}
+                  title="Refresh Remotes"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                If "Generate New Config" is selected, a one-time authorization
+                window will open in your browser. The config will be saved as "
+                {DEFAULT_RCLONE_CONFIG_NAME}" for future use.
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter>
+            {loading ? (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="w-full"
+              >
+                {cancelling ? "Cancelling..." : "Cancel Download"}
+              </Button>
+            ) : (
+              <Button type="submit" className="w-full">
+                Start Download
+              </Button>
+            )}
+          </CardFooter>
+        </form>
+      </Card>
 
       {/* Progress & Logs */}
       {loading && (
         <div className="space-y-4">
-          <TransferStatus />
           <p className="text-center text-sm text-muted-foreground animate-pulse">
             Starting download process...
           </p>
@@ -203,13 +278,19 @@ export default function DownloadPage() {
       )}
 
       {/* Status Output */}
-      <div className="bg-muted p-4 rounded-lg overflow-x-auto">
-        <h3 className="text-sm font-bold mb-2">Logs</h3>
-        <pre className="text-xs font-mono whitespace-pre-wrap">
-          {log || "Ready to download."}
-        </pre>
-        {status && <p className="mt-2 text-sm font-semibold">{status}</p>}
-      </div>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-bold">Logs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            readOnly
+            value={log || "Ready to download."}
+            className="font-mono text-xs min-h-37.5"
+          />
+          {status && <p className="mt-2 text-sm font-semibold">{status}</p>}
+        </CardContent>
+      </Card>
     </div>
   );
 }
