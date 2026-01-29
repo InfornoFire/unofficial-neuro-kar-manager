@@ -37,10 +37,16 @@ export default function Layout() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto w-full relative">
-        <div style={{ display: location.pathname === "/home" ? "block" : "none" }}>
+        <div
+          style={{ display: location.pathname === "/home" ? "block" : "none" }}
+        >
           <HomePage />
         </div>
-        <div style={{ display: location.pathname === "/download" ? "block" : "none" }}>
+        <div
+          style={{
+            display: location.pathname === "/download" ? "block" : "none",
+          }}
+        >
           <DownloadPage />
         </div>
       </main>

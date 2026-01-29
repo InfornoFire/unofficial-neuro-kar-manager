@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Unofficial Neuro Karaoke Archive Manager",
-        "width": 800,
-        "height": 600,
+        "width": 1050,
+        "height": 700,
         "backgroundColor": "#020618"
       }
     ],

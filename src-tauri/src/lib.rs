@@ -22,6 +22,8 @@ pub fn run() {
             download_rclone,
             check_rclone,
             api::gdrive::get_gdrive_remotes,
+            api::gdrive::create_gdrive_remote,
+            api::gdrive::list_gdrive_files,
             api::gdrive::download_gdrive,
             api::rclone::get_stats,
             api::rclone::stop_rc_server

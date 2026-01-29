@@ -1,8 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { DownloadCloud, Folder, RefreshCw, Save, Settings } from "lucide-react";
+import {
+  Check,
+  DownloadCloud,
+  Folder,
+  FolderSearch,
+  Info,
+  Key,
+  Save,
+  Settings,
+  XCircle,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { DownloadsButton } from "@/components/DownloadsButton";
+import FileBrowserModal from "@/components/FileBrowserModal";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,6 +23,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -30,22 +46,22 @@ export default function DownloadPage() {
   const [source, setSource] = useState(DEFAULT_GDRIVE_SOURCE);
   const [destination, setDestination] = useState("");
   const [remotes, setRemotes] = useState<string[]>([]);
-  const [selectedRemote, setSelectedRemote] = useState<string | null>(DEFAULT_RCLONE_CONFIG_NAME);
+  const [selectedRemote, setSelectedRemote] = useState<string | null>(
+    DEFAULT_RCLONE_CONFIG_NAME,
+  );
   const [useSubfolder, setUseSubfolder] = useState(true);
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [status, setStatus] = useState("");
   const [log, setLog] = useState("");
 
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<string[] | null>(null);
+
   const fetchRemotes = useCallback(async () => {
     try {
       const availableRemotes = await invoke<string[]>("get_gdrive_remotes");
       setRemotes(availableRemotes);
-      if (availableRemotes.includes(DEFAULT_RCLONE_CONFIG_NAME)) {
-        setSelectedRemote(DEFAULT_RCLONE_CONFIG_NAME);
-      } else {
-        setSelectedRemote(null);
-      }
     } catch (err) {
       console.error("Failed to fetch remotes", err);
       setLog((prev) => `${prev}Error fetching remotes: ${err}\n`);
@@ -55,6 +71,45 @@ export default function DownloadPage() {
   useEffect(() => {
     fetchRemotes();
   }, [fetchRemotes]);
+
+  useEffect(() => {
+    setSelectedRemote((prev) => {
+      // If manually selected "new config" (null), keep it.
+      if (prev === null) {
+        return null;
+      }
+      // If the currently selected remote is still in the list, keep it.
+      if (remotes.includes(prev)) {
+        return prev;
+      }
+      // Otherwise, prefer the default config if available.
+      if (remotes.includes(DEFAULT_RCLONE_CONFIG_NAME)) {
+        return DEFAULT_RCLONE_CONFIG_NAME;
+      }
+      return null;
+    });
+  }, [remotes]);
+
+  const handleCreateConfig = async () => {
+    setLoading(true);
+    setLog(
+      (prev) => `${prev}\nStarting authorization flow... check your browser.`,
+    );
+    try {
+      const newConfigName = await invoke<string>("create_gdrive_remote");
+      setLog(
+        (prev) =>
+          `${prev}\nAuthorization successful. Config created: ${newConfigName}`,
+      );
+      await fetchRemotes();
+      setSelectedRemote(newConfigName);
+    } catch (err) {
+      console.error(err);
+      setLog((prev) => `${prev}\nAuthorization failed: ${err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSelectDestination = async () => {
     try {
@@ -92,18 +147,24 @@ export default function DownloadPage() {
       return;
     }
 
+    if (!selectedRemote) {
+      setStatus("Please select a remote configuration.");
+      return;
+    }
+
     setLoading(true);
     setStatus("Downloading...");
     setLog(
-      `Starting download...\nSource: ${source}\nDestination: ${destination}\nRemote: ${selectedRemote || "(Auto-auth)"}\n`,
+      `Starting download...\nSource: ${source}\nDestination: ${destination}\nRemote: ${selectedRemote}\n`,
     );
 
     try {
       const output = await invoke<string>("download_gdrive", {
         source,
         destination,
-        remoteConfig: selectedRemote || null,
+        remoteConfig: selectedRemote,
         createSubfolder: useSubfolder,
+        selectedFiles,
       });
       setStatus("Download completed successfully.");
       setLog((prev) => `${prev}\n${output}`);
@@ -117,8 +178,24 @@ export default function DownloadPage() {
     }
   };
 
+  const isConfigValid = !!selectedRemote;
+
   return (
     <div className="container mx-auto p-6 max-w-3xl space-y-8">
+      {showBrowser && isConfigValid && (
+        <FileBrowserModal
+          isOpen={showBrowser}
+          onClose={() => setShowBrowser(false)}
+          onConfirm={(files) => {
+            setSelectedFiles(files);
+            setShowBrowser(false);
+          }}
+          source={source}
+          remoteConfig={selectedRemote || ""}
+          initialSelection={selectedFiles || []}
+        />
+      )}
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -135,84 +212,40 @@ export default function DownloadPage() {
       <Card>
         <form onSubmit={handleDownload}>
           <CardContent className="space-y-6 pt-6">
-            {/* Source Input */}
-            <div className="space-y-2">
-              <Label htmlFor="source" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                GDrive Source (Link or ID)
-              </Label>
-              <Input
-                id="source"
-                type="text"
-                placeholder="e.g. 1AbCdEfGhIjK..."
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-
-            {/* Destination Input */}
-            <div className="space-y-2">
-              <Label htmlFor="destination" className="flex items-center gap-2">
-                <Save className="h-4 w-4" />
-                Destination (Local Folder Path)
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="destination"
-                  type="text"
-                  placeholder="/home/user/Downloads/..."
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                  disabled={loading}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleSelectDestination}
-                  disabled={loading}
-                  title="Select Folder"
-                >
-                  <Folder className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex items-center space-x-2 pt-1">
-                <Checkbox
-                  id="useSubfolder"
-                  checked={useSubfolder}
-                  onCheckedChange={(checked) =>
-                    setUseSubfolder(checked as boolean)
-                  }
-                  disabled={loading}
-                />
-                <Label
-                  htmlFor="useSubfolder"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  title="Appends '/Unofficial-Neuro-Karaoke-Archive' to the destination path."
-                >
-                  Place items in subfolder (/Unofficial-Neuro-Karaoke-Archive)
-                </Label>
-              </div>
-            </div>
-
             {/* Remote Selection */}
             <div className="space-y-2">
-              <Label
-                htmlFor="remote-config"
-                className="flex items-center gap-2"
-              >
-                <Folder className="h-4 w-4" />
-                Rclone Remote Config
-              </Label>
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor="remote-config"
+                  className="flex items-center gap-2"
+                >
+                  <Folder className="h-4 w-4" />
+                  Rclone Remote Config
+                </Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <Info className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80">
+                    <p className="text-sm">
+                      If "Generate New Config" is selected, clicking the Key
+                      button will open a one-time authorization window in your
+                      browser. The config will be saved as "
+                      {DEFAULT_RCLONE_CONFIG_NAME}" for future use.
+                    </p>
+                  </HoverCardContent>
+                </HoverCard>
+              </div>
               <div className="flex gap-2">
                 <div className="flex-1">
                   <Select
-                    key={remotes.length}
                     value={selectedRemote || "new_config"}
                     onValueChange={(val) =>
                       setSelectedRemote(val === "new_config" ? null : val)
                     }
+                    onOpenChange={(open) => {
+                      if (open) fetchRemotes();
+                    }}
                     disabled={loading}
                   >
                     <SelectTrigger id="remote-config">
@@ -230,22 +263,108 @@ export default function DownloadPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {!selectedRemote && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCreateConfig}
+                    disabled={loading}
+                    title="Authenticate & Generate Config"
+                  >
+                    <Key className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Source Input */}
+            <div className="space-y-2">
+              <Label htmlFor="source" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                GDrive Source (Link or ID)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="source"
+                  type="text"
+                  placeholder="e.g. 1AbCdEfGhIjK..."
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  disabled={loading || !isConfigValid}
+                />
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
-                  onClick={fetchRemotes}
-                  disabled={loading}
-                  title="Refresh Remotes"
+                  title="Browse Files"
+                  disabled={loading || !isConfigValid}
+                  onClick={() => setShowBrowser(true)}
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <FolderSearch className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                If "Generate New Config" is selected, a one-time authorization
-                window will open in your browser. The config will be saved as "
-                {DEFAULT_RCLONE_CONFIG_NAME}" for future use.
-              </p>
+
+              {/* Show Selection Status */}
+              {selectedFiles && selectedFiles.length > 0 && (
+                <div className="text-sm text-blue-500 flex items-center gap-2 mt-1">
+                  <Check className="h-3 w-3" />
+                  {selectedFiles.length} files/folders selected for download.
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-destructive flex items-center"
+                    onClick={() => setSelectedFiles(null)}
+                  >
+                    <XCircle className="h-3 w-3 ml-1" /> Clear
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Destination Input */}
+            <div className="space-y-2">
+              <Label htmlFor="destination" className="flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Destination (Local Folder Path)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="destination"
+                  type="text"
+                  placeholder="/home/user/Downloads/..."
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  disabled={loading || !isConfigValid}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleSelectDestination}
+                  disabled={loading || !isConfigValid}
+                  title="Select Folder"
+                >
+                  <Folder className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center space-x-2 pt-1">
+                <Checkbox
+                  id="useSubfolder"
+                  checked={useSubfolder}
+                  onCheckedChange={(checked) =>
+                    setUseSubfolder(checked as boolean)
+                  }
+                  disabled={loading || !isConfigValid}
+                />
+                <Label
+                  htmlFor="useSubfolder"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  title="Appends '/Unofficial-Neuro-Karaoke-Archive' to the destination path."
+                >
+                  Place items in subfolder (/Unofficial-Neuro-Karaoke-Archive)
+                </Label>
+              </div>
             </div>
           </CardContent>
           <CardFooter>
@@ -260,7 +379,11 @@ export default function DownloadPage() {
                 {cancelling ? "Cancelling..." : "Cancel Download"}
               </Button>
             ) : (
-              <Button type="submit" className="w-full">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={!isConfigValid}
+              >
                 Start Download
               </Button>
             )}
