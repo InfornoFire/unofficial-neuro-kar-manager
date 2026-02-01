@@ -1,27 +1,61 @@
 pub mod api;
 pub mod utils;
 
-#[tauri::command]
-async fn download_rclone() -> Result<String, String> {
-    api::rclone::download_rclone()
-        .await
-        .map(|path| path.to_string_lossy().into_owned())
+use std::sync::{Arc, Mutex};
+use tauri::Manager;
+use tauri_plugin_shell::process::CommandChild;
+
+#[derive(Clone)]
+pub struct SharedChild(pub Arc<Mutex<Option<CommandChild>>>);
+
+impl SharedChild {
+    pub fn kill(&self) {
+        if let Ok(mut lock) = self.0.lock() {
+            if let Some(child) = lock.take() {
+                let _ = child.kill();
+            }
+        }
+    }
+}
+
+pub struct SidecarManager {
+    pub processes: Mutex<Vec<SharedChild>>,
+}
+
+impl Default for SidecarManager {
+    fn default() -> Self {
+        Self {
+            processes: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+impl SidecarManager {
+    pub fn add(&self, child: CommandChild) -> SharedChild {
+        let shared = SharedChild(Arc::new(Mutex::new(Some(child))));
+        if let Ok(mut lock) = self.processes.lock() {
+            lock.push(shared.clone());
+        }
+        shared
+    }
 }
 
 #[tauri::command]
-async fn check_rclone() -> bool {
-    api::rclone::is_rclone_installed().await.is_some()
+async fn check_rclone(app: tauri::AppHandle) -> bool {
+    use tauri_plugin_shell::ShellExt;
+    app.shell().sidecar("rclone").is_ok()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .manage(SidecarManager::default())
         .manage(api::gdrive::GdriveAuthState::default())
         .invoke_handler(tauri::generate_handler![
-            download_rclone,
             check_rclone,
             api::gdrive::get_gdrive_remotes,
             api::gdrive::create_gdrive_remote,
@@ -34,11 +68,15 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error building tauri application")
-        .run(|_app_handle, event| {
+        .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                let _ = tauri::async_runtime::block_on(async {
-                    let _ = api::rclone::stop_rc_server().await;
-                });
+                // Kill all sidecars
+                let state = app_handle.state::<SidecarManager>();
+                if let Ok(processes) = state.processes.lock() {
+                    for child in processes.iter() {
+                        child.kill();
+                    }
+                }
             }
         });
 }

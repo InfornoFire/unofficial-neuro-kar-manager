@@ -4,10 +4,11 @@ use crate::api::rclone;
 
 #[tauri::command]
 pub async fn list_gdrive_files(
+    app: tauri::AppHandle,
     source: String,
     remote_config: String,
 ) -> Result<Vec<GdriveFile>, String> {
-    let client = rclone::get_sdk_client().await?;
+    let client = rclone::get_sdk_client(&app).await?;
     let root_id = parse_gdrive_id(&source);
 
     // Construct fs pointing to the root of the share/folder

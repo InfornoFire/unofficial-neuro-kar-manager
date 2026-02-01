@@ -16,21 +16,20 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+reqwest = { version = "=0.13.1", features = ["blocking", "rustls-native-certs"] }
+zip = "=7.2.0"
 
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.13.1", features = ["json", "stream"] }
-tokio = { version = "1.49.0", features = ["full"] }
-zip = "7.2.0"
+reqwest = { version = "=0.13.1", features = ["json", "stream"] }
+tokio = { version = "=1.49.0", features = ["full"] }
+zip = "=7.2.0"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
-rclone-sdk = "1.72.1"
-chrono = "0.4.43"
-regex = "1.12.2"
-libc = "0.2.180"
-
-[target."cfg(windows)".dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Security"] }
+rclone-sdk = "=1.72.1"
+chrono = "=0.4.43"
+regex = "=1.12.2"
+tauri-plugin-shell = "2"

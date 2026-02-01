@@ -14,32 +14,19 @@ export default function InitPage() {
         setInitMessage("Finding Rclone...");
         setProgress(10);
 
-        // Artificial delay for UX
-        await new Promise((r) => setTimeout(r, 600));
-
         const installed = await invoke<boolean>("check_rclone");
 
         if (installed) {
           setInitMessage("Found Rclone.");
           setProgress(100);
-          await new Promise((r) => setTimeout(r, 500));
           navigate("/home");
           return;
         }
 
-        setInitMessage("Rclone not found.");
-        setProgress(30);
-        await new Promise((r) => setTimeout(r, 800));
-
-        setInitMessage("Installing local copy of Rclone...");
-        setProgress(50);
-
-        await invoke("download_rclone");
-
-        setInitMessage("Installed Rclone.");
-        setProgress(100);
-        await new Promise((r) => setTimeout(r, 800));
-        navigate("/home");
+        setInitMessage(
+          "Error: Rclone binary not found. It should be bundled with the app. Please report this to the developers.",
+        );
+        setProgress(0);
       } catch (e) {
         setInitMessage(`Error: ${e}`);
         setProgress(0);

@@ -276,6 +276,7 @@ async fn get_job_stats(client: &rclone_sdk::Client) -> Result<SyncJobResult, Str
 
 #[tauri::command]
 pub async fn download_gdrive(
+    app: tauri::AppHandle,
     source: String,
     destination: String,
     remote_config: Option<String>,
@@ -296,7 +297,7 @@ pub async fn download_gdrive(
 
     let _ = rclone::stop_rc_server().await;
 
-    let client = rclone::get_sdk_client().await?;
+    let client = rclone::get_sdk_client(&app).await?;
     let paths = config.build_filesystem_paths()?;
     let body = config.build_request_body(&paths);
 
@@ -308,6 +309,7 @@ pub async fn download_gdrive(
 /// Perform a dry run sync to detect what files would be deleted
 #[tauri::command]
 pub async fn check_dry_run(
+    app: tauri::AppHandle,
     source: String,
     destination: String,
     remote_config: Option<String>,
@@ -327,7 +329,7 @@ pub async fn check_dry_run(
 
     let _ = rclone::stop_rc_server().await;
 
-    let client = rclone::get_sdk_client().await?;
+    let client = rclone::get_sdk_client(&app).await?;
     let paths = config.build_filesystem_paths()?;
 
     // Build the sync request with dry-run flag
