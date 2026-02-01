@@ -16,17 +16,12 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { useDownloadForm } from "@/hooks/useDownloadForm";
 import { useDownloadProcess } from "@/hooks/useDownloadProcess";
 import { useRemoteConfig } from "@/hooks/useRemoteConfig";
-import type { DryRunResult } from "@/types/download";
 
 export default function DownloadPage() {
   const remoteConfig = useRemoteConfig();
   const form = useDownloadForm();
   const download = useDownloadProcess();
 
-  const [showWarning, setShowWarning] = useState(false);
-  const [dryRunResult, setDryRunResult] = useState<DryRunResult | undefined>(
-    undefined,
-  );
   const [showBrowser, setShowBrowser] = useState(false);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
@@ -92,37 +87,11 @@ export default function DownloadPage() {
       ? form.deleteExcluded
       : false;
 
-    await download.startDownload(
-      {
-        source: form.source,
-        destination: form.destination,
-        remoteConfig: remoteConfig.selectedRemote,
-        createSubfolder: form.useSubfolder,
-        selectedFiles: form.selectedFiles,
-        createBackup: form.createBackup,
-        deleteExcluded: effectiveDeleteExcluded,
-      },
-      (result) => {
-        setDryRunResult(result);
-        setShowWarning(true);
-      },
-    );
-  };
-
-  const handleConfirmDownload = async () => {
-    setShowWarning(false);
-    if (!remoteConfig.selectedRemote) return;
-
-    const hasFileSelection =
-      !!form.selectedFiles && form.selectedFiles.length > 0;
-    const effectiveDeleteExcluded = hasFileSelection
-      ? form.deleteExcluded
-      : false;
-
-    await download.executeDownload({
+    await download.startDownload({
       source: form.source,
       destination: form.destination,
       remoteConfig: remoteConfig.selectedRemote,
+      syncMode: form.syncMode,
       createSubfolder: form.useSubfolder,
       selectedFiles: form.selectedFiles,
       createBackup: form.createBackup,
@@ -135,11 +104,11 @@ export default function DownloadPage() {
   return (
     <div className="container mx-auto p-6 max-w-3xl space-y-8">
       <BackupWarningDialog
-        open={showWarning}
-        onOpenChange={setShowWarning}
-        dryRunResult={dryRunResult}
+        open={!!download.dryRunResult}
+        onOpenChange={(open) => !open && download.cancelDownload()}
+        dryRunResult={download.dryRunResult || undefined}
         hasBackup={form.createBackup}
-        onConfirm={handleConfirmDownload}
+        onConfirm={download.confirmDownload}
       />
 
       <AuthDialog
@@ -205,6 +174,8 @@ export default function DownloadPage() {
             <DestinationSection
               destination={form.destination}
               onDestinationChange={form.setDestination}
+              syncMode={form.syncMode}
+              onSyncModeChange={form.setSyncMode}
               useSubfolder={form.useSubfolder}
               onUseSubfolderChange={form.setUseSubfolder}
               createBackup={form.createBackup}
@@ -221,6 +192,7 @@ export default function DownloadPage() {
           <CardFooter>
             {download.loading ? (
               <Button
+                key={String(download.cancelling)}
                 type="button"
                 variant="destructive"
                 onClick={download.cancelDownload}

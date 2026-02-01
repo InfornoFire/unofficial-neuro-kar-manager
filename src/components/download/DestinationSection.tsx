@@ -8,10 +8,13 @@ import {
 } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 interface DestinationSectionProps {
   destination: string;
   onDestinationChange: (destination: string) => void;
+  syncMode: boolean;
+  onSyncModeChange: (checked: boolean) => void;
   useSubfolder: boolean;
   onUseSubfolderChange: (checked: boolean) => void;
   createBackup: boolean;
@@ -26,6 +29,8 @@ interface DestinationSectionProps {
 export function DestinationSection({
   destination,
   onDestinationChange,
+  syncMode,
+  onSyncModeChange,
   useSubfolder,
   onUseSubfolderChange,
   createBackup,
@@ -61,6 +66,30 @@ export function DestinationSection({
         >
           <Folder className="h-4 w-4" />
         </Button>
+      </div>
+      <div className="flex items-center space-x-2 pt-1">
+        <Switch
+          id="syncMode"
+          checked={syncMode}
+          onCheckedChange={onSyncModeChange}
+          disabled={disabled}
+        />
+        <Label
+          htmlFor="syncMode"
+          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+        >
+          {syncMode ? "Sync Mode (Destructive)" : "Copy Mode (Download Only)"}
+          <HoverCard>
+            <HoverCardTrigger asChild>
+              <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
+            </HoverCardTrigger>
+            <HoverCardContent className="w-80">
+              <p className="text-sm">
+                Copy will only download/update files. Sync can additionally delete unwanted files (including if files were renamed).
+              </p>
+            </HoverCardContent>
+          </HoverCard>
+        </Label>
       </div>
       <div className="flex items-center space-x-2 pt-1">
         <Checkbox
@@ -123,7 +152,7 @@ export function DestinationSection({
           onCheckedChange={(checked) =>
             onDeleteExcludedChange(checked as boolean)
           }
-          disabled={disabled || !hasFileSelection}
+          disabled={disabled || !hasFileSelection || !syncMode}
         />
         <Label
           htmlFor="deleteExcluded"

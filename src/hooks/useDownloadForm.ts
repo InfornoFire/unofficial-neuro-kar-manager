@@ -5,6 +5,7 @@ const DEFAULT_GDRIVE_SOURCE = "1B1VaWp-mCKk15_7XpFnImsTdBJPOGx7a";
 export function useDownloadForm() {
   const [source, setSource] = useState(DEFAULT_GDRIVE_SOURCE);
   const [destination, setDestination] = useState("");
+  const [syncMode, setSyncMode] = useState(true);
   const [useSubfolder, setUseSubfolder] = useState(true);
   const [createBackup, setCreateBackup] = useState(true);
   const [deleteExcluded, setDeleteExcluded] = useState(true);
@@ -19,6 +20,8 @@ export function useDownloadForm() {
     setSource,
     destination,
     setDestination,
+    syncMode,
+    setSyncMode,
     useSubfolder,
     setUseSubfolder,
     createBackup,

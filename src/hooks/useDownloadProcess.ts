@@ -1,41 +1,88 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { DownloadParams, DryRunResult } from "@/types/download";
 
 export function useDownloadProcess() {
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const isCancelledRef = useRef(false);
   const [status, setStatus] = useState("");
   const [log, setLog] = useState("");
+  const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
+  const [pendingParams, setPendingParams] = useState<DownloadParams | null>(null);
 
   const appendLog = (message: string) => {
     setLog((prev) => `${prev}${message}\n`);
   };
 
-  const checkDryRun = async (
-    params: Omit<DownloadParams, "createBackup">,
-  ): Promise<DryRunResult> => {
-    const result = await invoke<DryRunResult>("check_dry_run", {
-      source: params.source,
-      destination: params.destination,
-      remoteConfig: params.remoteConfig,
-      createSubfolder: params.createSubfolder,
-      selectedFiles: params.selectedFiles,
-      deleteExcluded: params.deleteExcluded,
-    });
-    return result;
+  const setCancelledState = (isCancelled: boolean) => {
+    isCancelledRef.current = isCancelled;
+    setCancelling(isCancelled);
   };
 
-  const executeDownload = async (params: DownloadParams) => {
+  const clearPendingState = () => {
+    setDryRunResult(null);
+    setPendingParams(null);
+  };
+
+  const handleTransferCancelled = (message = "\nDownload cancelled.") => {
+    setStatus("Cancelled.");
+    appendLog(message);
+    setLoading(false);
+
+    // Ensure states are synced with the current cancellation intention
+    setCancelledState(false);
+  };
+
+  const isCancellationError = (error: unknown) => {
+    const errStr = String(error);
+    return errStr.includes("cancelled") || isCancelledRef.current;
+  };
+
+  const cancelDownload = async () => {
+    // If the modal is open (not loading, result present), handle standard cancel
+    if (!loading && dryRunResult) {
+      clearPendingState();
+      appendLog("\nDownload cancelled by user.");
+      setStatus("Cancelled.");
+      return;
+    }
+    
+    // If already cancelling, ignore
+    if (cancelling) return;
+
+    // Set cancellation flags
+    setCancelledState(true);
+
+    try {
+      appendLog("\nRequesting cancellation...");
+      await invoke("stop_rc_server");
+    } catch (err) {
+      console.error("Failed to stop rclone", err);
+      appendLog(`\nFailed to stop rclone: ${err}`);
+      // Even if stop fails, consider it cancelled on frontend naturally
+      setCancelling(false);
+    }
+  };
+
+  const runDownload = async (params: DownloadParams) => {
+    if (isCancelledRef.current) {
+         handleTransferCancelled();
+         return;
+    }
+
     setLoading(true);
     setStatus("Downloading...");
     appendLog(`Starting download...\n`);
+
+    clearPendingState();
 
     try {
       const output = await invoke<string>("download_gdrive", {
         source: params.source,
         destination: params.destination,
         remoteConfig: params.remoteConfig,
+        syncMode: params.syncMode,
         createSubfolder: params.createSubfolder,
         selectedFiles: params.selectedFiles,
         createBackup: params.createBackup,
@@ -44,59 +91,88 @@ export function useDownloadProcess() {
       setStatus("Download completed successfully.");
       appendLog(`\n${output}`);
     } catch (error) {
-      console.error(error);
-      setStatus("Download failed.");
-      appendLog(`\nError: ${error}`);
+      if (isCancellationError(error)) {
+        handleTransferCancelled();
+      } else {
+        console.error(error);
+        setStatus("Download failed.");
+        appendLog(`\nError: ${error}`);
+      }
     } finally {
       setLoading(false);
-      setCancelling(false);
+      setCancelledState(false);
     }
   };
 
-  const startDownload = async (
-    params: DownloadParams,
-    onWarningNeeded: (dryRunResult: DryRunResult) => void,
-  ) => {
-    setLog(
-      `Download Configuration:\nSource: ${params.source}\nDestination: ${params.destination}\nRemote: ${params.remoteConfig}\nBackup: ${params.createBackup ? "Yes" : "No"}\nDelete Excluded: ${params.deleteExcluded ? "Yes" : "No"}\n`,
-    );
+  const startDownload = async (params: DownloadParams) => {
+    setCancelledState(false);
+    
+    const logMessage = `Download Configuration:\nSource: ${params.source}\nDestination: ${params.destination}\nRemote: ${params.remoteConfig}\nBackup: ${params.createBackup ? "Yes" : "No"}\nSync Mode: ${params.syncMode ? "Yes" : "No"}\n`;
+    const deleteExcludedLog = params.syncMode
+      ? `Delete Excluded: ${params.deleteExcluded ? "Yes" : "No"}\n`
+      : "";
+    setLog(logMessage + deleteExcludedLog);
+
+    setLoading(true);
+    setStatus("Preparing...");
+
+    if (!params.syncMode) {
+      appendLog("\nCopy mode enabled. Skipping dry run check...");
+      await runDownload(params);
+      return;
+    }
 
     appendLog("\nPerforming dry run to check for potential file deletions...");
 
     try {
-      const result = await checkDryRun(params);
+      const result = await invoke<DryRunResult>("check_dry_run", {
+        source: params.source,
+        destination: params.destination,
+        remoteConfig: params.remoteConfig,
+        createSubfolder: params.createSubfolder,
+        selectedFiles: params.selectedFiles,
+        deleteExcluded: params.deleteExcluded,
+      });
+
+      // If user clicked cancel while dry run was in progress, abort here
+      if (isCancelledRef.current) {
+        handleTransferCancelled("\nDry run cancelled by user.");
+        return;
+      }
+
       appendLog(`Dry run complete: ${result.stats}`);
 
-      // Only show warning if files would be deleted
       if (result.would_delete) {
-        appendLog("Warning: Files will be deleted during this operation.");
-        onWarningNeeded(result);
+        appendLog("Warning: Files will be deleted. Waiting for confirmation...");
+        setDryRunResult(result);
+        setPendingParams(params);
+        setLoading(false);
       } else {
         appendLog("No files will be deleted. Proceeding with download...");
-        await executeDownload(params);
+        await runDownload(params);
       }
     } catch (error) {
+      if (isCancellationError(error)) {
+        handleTransferCancelled("\nDry run cancelled.");
+        return;
+      }
+
       appendLog(`\nDry run failed: ${error}`);
       appendLog("You can still proceed, but file deletion status is unknown.");
-      // Show warning anyway since we couldn't verify
-      onWarningNeeded({
+
+      setDryRunResult({
         would_delete: false,
         deleted_files: [],
         stats: "Dry run check failed",
       });
+      setPendingParams(params);
+      setLoading(false);
     }
   };
 
-  const cancelDownload = async () => {
-    if (cancelling) return;
-    setCancelling(true);
-    try {
-      appendLog("\nRequesting cancellation...");
-      await invoke("stop_rc_server");
-    } catch (err) {
-      console.error("Failed to stop rclone", err);
-      appendLog(`\nFailed to stop rclone: ${err}`);
-      setCancelling(false);
+  const confirmDownload = () => {
+    if (pendingParams) {
+      runDownload(pendingParams);
     }
   };
 
@@ -105,9 +181,10 @@ export function useDownloadProcess() {
     cancelling,
     status,
     log,
-    appendLog,
+    dryRunResult,
     startDownload,
-    executeDownload,
+    confirmDownload,
     cancelDownload,
+    appendLog,
   };
 }

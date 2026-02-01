@@ -4,9 +4,13 @@ use rclone_sdk::Client;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::ShellExt;
+use tokio::sync::Mutex;
+use std::sync::LazyLock;
 
 pub const RC_PORT: u16 = 5572;
 pub const RC_URL: &str = "http://localhost:5572";
+
+static SHUTDOWN_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 /// Helper to check if the RC server is listening
 pub async fn is_server_running() -> bool {
@@ -83,6 +87,9 @@ pub async fn get_sdk_client(app: &AppHandle) -> Result<Client, String> {
 
 #[tauri::command]
 pub async fn stop_rc_server() -> Result<(), String> {
+    // Lock to prevent concurrent shutdowns
+    let _guard = SHUTDOWN_LOCK.lock().await;
+
     if is_server_running().await {
         let client = Client::new(RC_URL);
         client

@@ -27,6 +27,7 @@ struct DownloadConfig {
     source: String,
     destination: String,
     remote_config: String,
+    sync_mode: bool,
     create_subfolder: bool,
     selected_files: Option<Vec<String>>,
     create_backup: bool,
@@ -45,6 +46,7 @@ impl DownloadConfig {
         source: String,
         destination: String,
         remote_config: Option<String>,
+        sync_mode: bool,
         create_subfolder: bool,
         selected_files: Option<Vec<String>>,
         create_backup: bool,
@@ -57,6 +59,7 @@ impl DownloadConfig {
             source,
             destination,
             remote_config,
+            sync_mode,
             create_subfolder,
             selected_files,
             create_backup,
@@ -171,14 +174,15 @@ fn build_file_filter(files: &[String]) -> serde_json::Value {
     })
 }
 
-/// Start the sync operation, wait for completion, and return the results
+/// Start the sync/copy operation, wait for completion, and return the results
 async fn start_sync_job(
     client: &rclone_sdk::Client,
     body: &serde_json::Value,
+    endpoint: &str,
 ) -> Result<SyncJobResult, String> {
     let response = client
         .client()
-        .post(format!("{}/sync/sync", client.baseurl()))
+        .post(format!("{}{}", client.baseurl(), endpoint))
         .json(body)
         .send()
         .await
@@ -200,7 +204,7 @@ async fn start_sync_job(
     poll_job_completion(client, jobid).await?;
 
     // Get final stats
-    get_job_stats(client).await
+    get_job_stats(client, jobid).await
 }
 
 /// Poll for job completion
@@ -253,10 +257,13 @@ async fn poll_job_completion(client: &rclone_sdk::Client, jobid: i64) -> Result<
 }
 
 /// Get job statistics from rclone
-async fn get_job_stats(client: &rclone_sdk::Client) -> Result<SyncJobResult, String> {
+async fn get_job_stats(client: &rclone_sdk::Client, jobid: i64) -> Result<SyncJobResult, String> {
     let stats_response = client
         .client()
         .post(format!("{}/core/stats", client.baseurl()))
+        .json(&serde_json::json!({
+            "group": format!("job/{}", jobid)
+        }))
         .send()
         .await
         .map_err(|e| format!("Failed to get stats: {}", e))?;
@@ -280,6 +287,7 @@ pub async fn download_gdrive(
     source: String,
     destination: String,
     remote_config: Option<String>,
+    sync_mode: bool,
     create_subfolder: bool,
     selected_files: Option<Vec<String>>,
     create_backup: bool,
@@ -289,19 +297,19 @@ pub async fn download_gdrive(
         source,
         destination,
         remote_config,
+        sync_mode,
         create_subfolder,
         selected_files,
         create_backup,
         delete_excluded,
     )?;
 
-    let _ = rclone::stop_rc_server().await;
-
     let client = rclone::get_sdk_client(&app).await?;
     let paths = config.build_filesystem_paths()?;
     let body = config.build_request_body(&paths);
 
-    let _result = start_sync_job(&client, &body).await?;
+    let endpoint = if config.sync_mode { "/sync/sync" } else { "/sync/copy" };
+    let _result = start_sync_job(&client, &body, endpoint).await?;
 
     Ok("Download completed successfully".to_string())
 }
@@ -321,13 +329,12 @@ pub async fn check_dry_run(
         source,
         destination,
         remote_config,
+        true, // Dry run is only for sync mode
         create_subfolder,
         selected_files,
         false, // No backup for dry run check
         delete_excluded,
     )?;
-
-    let _ = rclone::stop_rc_server().await;
 
     let client = rclone::get_sdk_client(&app).await?;
     let paths = config.build_filesystem_paths()?;
@@ -349,7 +356,7 @@ pub async fn check_dry_run(
     // Capture the current log offset to ignore previous logs
     let start_offset = rclone::LogManager::get_current_offset().await;
 
-    let result = start_sync_job(&client, &body).await?;
+    let result = start_sync_job(&client, &body, "/sync/sync").await?;
 
     // Parse logs from the offset
     let deleted_files = rclone::LogManager::parse_deleted_files(start_offset).await?;
