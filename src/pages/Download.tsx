@@ -46,6 +46,7 @@ export default function DownloadPage() {
       form.setUseSubfolder(config.useSubfolder);
       form.setCreateBackup(config.createBackup);
       form.setDeleteExcluded(config.deleteExcluded);
+      form.setTrackRenames(config.trackRenames);
 
       const savedFiles = config.selectedFiles?.[config.lastSource || ""];
       if (savedFiles) form.setSelectedFiles(savedFiles);
@@ -74,6 +75,7 @@ export default function DownloadPage() {
         useSubfolder: form.useSubfolder,
         createBackup: form.createBackup,
         deleteExcluded: form.deleteExcluded,
+        trackRenames: form.trackRenames,
         selectedFiles: newSelectedFiles,
       });
     }, 1000);
@@ -88,6 +90,7 @@ export default function DownloadPage() {
     form.useSubfolder,
     form.createBackup,
     form.deleteExcluded,
+    form.trackRenames,
     form.selectedFiles,
     saveConfig,
   ]);
@@ -153,6 +156,9 @@ export default function DownloadPage() {
       ? form.deleteExcluded
       : false;
 
+    // Track renames only makes sense if sync mode is on
+    const effectiveTrackRenames = form.syncMode ? form.trackRenames : false;
+
     await download.startDownload({
       source: form.source,
       destination: form.destination,
@@ -162,6 +168,7 @@ export default function DownloadPage() {
       selectedFiles: form.selectedFiles,
       createBackup: form.createBackup,
       deleteExcluded: effectiveDeleteExcluded,
+      trackRenames: effectiveTrackRenames,
     });
   };
 
@@ -249,6 +256,8 @@ export default function DownloadPage() {
               onCreateBackupChange={form.setCreateBackup}
               deleteExcluded={form.deleteExcluded}
               onDeleteExcludedChange={form.setDeleteExcluded}
+              trackRenames={form.trackRenames}
+              onTrackRenamesChange={form.setTrackRenames}
               hasFileSelection={
                 !!form.selectedFiles && form.selectedFiles.length > 0
               }

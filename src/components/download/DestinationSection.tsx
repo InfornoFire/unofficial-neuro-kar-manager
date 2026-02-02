@@ -21,6 +21,8 @@ interface DestinationSectionProps {
   onCreateBackupChange: (checked: boolean) => void;
   deleteExcluded: boolean;
   onDeleteExcludedChange: (checked: boolean) => void;
+  trackRenames: boolean;
+  onTrackRenamesChange: (checked: boolean) => void;
   hasFileSelection: boolean;
   onSelectFolder: () => void;
   disabled: boolean;
@@ -37,6 +39,8 @@ export function DestinationSection({
   onCreateBackupChange,
   deleteExcluded,
   onDeleteExcludedChange,
+  trackRenames,
+  onTrackRenamesChange,
   hasFileSelection,
   onSelectFolder,
   disabled,
@@ -170,6 +174,32 @@ export function DestinationSection({
                 will delete files not part of the archive normally, it fails to
                 do so when there is a filter selection. This option allows it to
                 delete files not in this selection.
+              </p>
+            </HoverCardContent>
+          </HoverCard>
+        </Label>
+      </div>
+      <div className="flex items-center space-x-2 pt-1">
+        <Checkbox
+          id="trackRenames"
+          checked={trackRenames}
+          onCheckedChange={(checked) =>
+            onTrackRenamesChange(checked as boolean)
+          }
+          disabled={disabled || !syncMode}
+        />
+        <Label
+          htmlFor="trackRenames"
+          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+        >
+          Track Renames (Hash Strategy)
+          <HoverCard>
+            <HoverCardTrigger asChild>
+              <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
+            </HoverCardTrigger>
+            <HoverCardContent className="w-80">
+              <p className="text-sm">
+                Enables --track-renames with hash strategy. Useful when files are moved or renamed on source, to avoid re-downloading them. Only active in Sync Mode.
               </p>
             </HoverCardContent>
           </HoverCard>

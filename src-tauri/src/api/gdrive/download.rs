@@ -32,6 +32,7 @@ struct DownloadConfig {
     selected_files: Option<Vec<String>>,
     create_backup: bool,
     delete_excluded: bool,
+    track_renames: bool,
 }
 
 /// Paths for source and destination filesystems
@@ -51,6 +52,7 @@ impl DownloadConfig {
         selected_files: Option<Vec<String>>,
         create_backup: bool,
         delete_excluded: bool,
+        track_renames: bool,
     ) -> Result<Self, String> {
         let remote_config = remote_config
             .ok_or("Remote configuration is required. Please authorize first.".to_string())?;
@@ -64,6 +66,7 @@ impl DownloadConfig {
             selected_files,
             create_backup,
             delete_excluded,
+            track_renames,
         })
     }
 
@@ -150,6 +153,14 @@ impl DownloadConfig {
 
         if let Some(ref backup) = paths.backup_path {
             config.insert("BackupDir".to_string(), serde_json::json!(backup));
+        }
+
+        if self.sync_mode && self.track_renames {
+            config.insert("TrackRenames".to_string(), serde_json::json!(true));
+            config.insert(
+                "TrackRenamesStrategy".to_string(),
+                serde_json::json!("hash"),
+            );
         }
 
         if !config.is_empty() {
@@ -309,6 +320,7 @@ pub async fn download_gdrive(
     selected_files: Option<Vec<String>>,
     create_backup: bool,
     delete_excluded: bool,
+    track_renames: bool,
 ) -> Result<String, String> {
     let config = DownloadConfig::new(
         source,
@@ -319,6 +331,7 @@ pub async fn download_gdrive(
         selected_files,
         create_backup,
         delete_excluded,
+        track_renames,
     )?;
 
     let client = rclone::get_sdk_client(&app).await?;
@@ -345,6 +358,7 @@ pub async fn check_dry_run(
     create_subfolder: bool,
     selected_files: Option<Vec<String>>,
     delete_excluded: bool,
+    track_renames: bool,
 ) -> Result<DryRunResult, String> {
     let config = DownloadConfig::new(
         source,
@@ -355,6 +369,7 @@ pub async fn check_dry_run(
         selected_files,
         false, // No backup for dry run check
         delete_excluded,
+        track_renames,
     )?;
 
     let client = rclone::get_sdk_client(&app).await?;

@@ -13,4 +13,5 @@ export interface DownloadParams {
   selectedFiles: string[] | null;
   createBackup: boolean;
   deleteExcluded: boolean;
+  trackRenames: boolean;
 }

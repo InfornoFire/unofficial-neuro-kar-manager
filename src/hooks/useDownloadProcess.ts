@@ -89,6 +89,7 @@ export function useDownloadProcess() {
         selectedFiles: params.selectedFiles,
         createBackup: params.createBackup,
         deleteExcluded: params.deleteExcluded,
+        trackRenames: params.trackRenames,
       });
       setStatus("Download completed successfully.");
       appendLog(`\n${output}`);
@@ -109,11 +110,25 @@ export function useDownloadProcess() {
   const startDownload = async (params: DownloadParams) => {
     setCancelledState(false);
 
-    const logMessage = `Download Configuration:\nSource: ${params.source}\nDestination: ${params.destination}\nRemote: ${params.remoteConfig}\nBackup: ${params.createBackup ? "Yes" : "No"}\nSync Mode: ${params.syncMode ? "Yes" : "No"}\n`;
-    const deleteExcludedLog = params.syncMode
-      ? `Delete Excluded: ${params.deleteExcluded ? "Yes" : "No"}\n`
-      : "";
-    setLog(logMessage + deleteExcludedLog);
+    const configLogs = [
+      "Download Configuration:",
+      `Source: ${params.source}`,
+      `Destination: ${params.destination}`,
+      `Remote: ${params.remoteConfig}`,
+      `Backup: ${params.createBackup ? "Yes" : "No"}`,
+      `Sync Mode: ${params.syncMode ? "Yes" : "No"}`,
+    ];
+
+    if (params.syncMode) {
+      configLogs.push(
+        `Delete Excluded: ${params.deleteExcluded ? "Yes" : "No"}`,
+      );
+      configLogs.push(
+        `Track Renames: ${params.trackRenames ? "Yes (Hash)" : "No"}`,
+      );
+    }
+
+    setLog(`${configLogs.join("\n")}\n`);
 
     setLoading(true);
     setStatus("Preparing...");
@@ -131,6 +146,7 @@ export function useDownloadProcess() {
         source: params.source,
         destination: params.destination,
         remoteConfig: params.remoteConfig,
+        trackRenames: params.trackRenames,
         createSubfolder: params.createSubfolder,
         selectedFiles: params.selectedFiles,
         deleteExcluded: params.deleteExcluded,
