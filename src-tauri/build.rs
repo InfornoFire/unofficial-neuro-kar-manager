@@ -61,6 +61,24 @@ fn setup_regular_sidecar(target_triple: &str, manifest_dir: &str) {
 }
 
 fn setup_android_sidecar(target_triple: &str, manifest_dir: &str) {
+    // Create dummy binary to satisfy Tauri CLI's sidecar requirements
+    // Tauri expects binaries/rclone-<target> to exist
+    let binaries_dir = Path::new(manifest_dir).join("binaries");
+    if !binaries_dir.exists() {
+        fs::create_dir_all(&binaries_dir).expect("Failed to create binaries directory");
+    }
+
+    let dummy_name = format!("rclone-{}", target_triple);
+    let dummy_path = binaries_dir.join(&dummy_name);
+
+    if !dummy_path.exists() {
+        println!(
+            "cargo:warning=Creating dummy sidecar for Android build satisfaction at {:?}",
+            dummy_path
+        );
+        fs::File::create(&dummy_path).expect("Failed to create dummy sidecar");
+    }
+
     // For Android, the binary goes into jniLibs
     let jni_dir = Path::new(manifest_dir).join("gen/android/app/src/main/jniLibs/arm64-v8a");
 

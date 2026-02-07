@@ -3,10 +3,10 @@ import { Trans } from "@lingui/react/macro";
 import { Folder, Info, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+  HybridTooltip,
+  HybridTooltipContent,
+  HybridTooltipTrigger,
+} from "@/components/ui/hybrid-tooltip";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -44,11 +44,11 @@ export function RemoteConfigSection({
           <Folder className="h-4 w-4" />
           <Trans>Rclone Remote Config</Trans>
         </Label>
-        <HoverCard>
-          <HoverCardTrigger asChild>
+        <HybridTooltip>
+          <HybridTooltipTrigger asChild>
             <Info className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
-          </HoverCardTrigger>
-          <HoverCardContent className="w-80">
+          </HybridTooltipTrigger>
+          <HybridTooltipContent className="w-80">
             <p className="text-sm">
               <Trans>
                 If "Generate New Config" is selected, clicking the Key button
@@ -57,8 +57,8 @@ export function RemoteConfigSection({
                 future use.
               </Trans>
             </p>
-          </HoverCardContent>
-        </HoverCard>
+          </HybridTooltipContent>
+        </HybridTooltip>
       </div>
       <div className="flex gap-2">
         <div className="flex-1">

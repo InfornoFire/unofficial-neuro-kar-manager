@@ -4,10 +4,10 @@ import { Folder, Info, Save, Settings } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+  HybridTooltip,
+  HybridTooltipContent,
+  HybridTooltipTrigger,
+} from "@/components/ui/hybrid-tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -102,27 +102,27 @@ export function DestinationSection({
           />
           <Label
             htmlFor="syncMode"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
             {syncMode ? (
               <Trans>Sync Mode (Destructive)</Trans>
             ) : (
               <Trans>Copy Mode (Download Only)</Trans>
             )}
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
-              </HoverCardTrigger>
-              <HoverCardContent className="w-80">
-                <p className="text-sm">
-                  <Trans>
-                    Copy will only download/update files. Sync can additionally
-                    delete unwanted files (including if files were renamed).
-                  </Trans>
-                </p>
-              </HoverCardContent>
-            </HoverCard>
           </Label>
+          <HybridTooltip>
+            <HybridTooltipTrigger asChild>
+              <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors peer-disabled:opacity-70" />
+            </HybridTooltipTrigger>
+            <HybridTooltipContent className="w-80">
+              <p className="text-sm">
+                <Trans>
+                  Copy will only download/update files. Sync can additionally
+                  delete unwanted files (including if files were renamed).
+                </Trans>
+              </p>
+            </HybridTooltipContent>
+          </HybridTooltip>
         </div>
 
         <Button

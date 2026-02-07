@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+  HybridTooltip,
+  HybridTooltipContent,
+  HybridTooltipTrigger,
+} from "@/components/ui/hybrid-tooltip";
 import { Label } from "@/components/ui/label";
 
 interface AdvancedOptionsModalProps {
@@ -70,23 +70,23 @@ export function AdvancedOptionsModal({
             />
             <Label
               htmlFor="useSubfolder"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
               <Trans>Place items in subfolder</Trans>
-              <HoverCard>
-                <HoverCardTrigger asChild>
-                  <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
-                </HoverCardTrigger>
-                <HoverCardContent className="w-80">
-                  <p className="text-sm">
-                    <Trans>
-                      Appends '/Unofficial-Neuro-Karaoke-Archive' to the
-                      destination path.
-                    </Trans>
-                  </p>
-                </HoverCardContent>
-              </HoverCard>
             </Label>
+            <HybridTooltip>
+              <HybridTooltipTrigger asChild>
+                <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors peer-disabled:opacity-70" />
+              </HybridTooltipTrigger>
+              <HybridTooltipContent className="w-80">
+                <p className="text-sm">
+                  <Trans>
+                    Appends '/Unofficial-Neuro-Karaoke-Archive' to the
+                    destination path.
+                  </Trans>
+                </p>
+              </HybridTooltipContent>
+            </HybridTooltip>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
@@ -99,23 +99,23 @@ export function AdvancedOptionsModal({
             />
             <Label
               htmlFor="createBackup"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
               <Trans>Create Backup Folder</Trans>
-              <HoverCard>
-                <HoverCardTrigger asChild>
-                  <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
-                </HoverCardTrigger>
-                <HoverCardContent className="w-80">
-                  <p className="text-sm">
-                    <Trans>
-                      Generate a Backup Folder outside of the destination at
-                      Backup-KAR-{"{TIME}"}
-                    </Trans>
-                  </p>
-                </HoverCardContent>
-              </HoverCard>
             </Label>
+            <HybridTooltip>
+              <HybridTooltipTrigger asChild>
+                <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors peer-disabled:opacity-70" />
+              </HybridTooltipTrigger>
+              <HybridTooltipContent className="w-80">
+                <p className="text-sm">
+                  <Trans>
+                    Generate a Backup Folder outside of the destination at
+                    Backup-KAR-{"{TIME}"}
+                  </Trans>
+                </p>
+              </HybridTooltipContent>
+            </HybridTooltip>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
@@ -128,26 +128,25 @@ export function AdvancedOptionsModal({
             />
             <Label
               htmlFor="deleteExcluded"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
               <Trans>Delete excluded files</Trans>
-              <HoverCard>
-                <HoverCardTrigger asChild>
-                  <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
-                </HoverCardTrigger>
-                <HoverCardContent className="w-80">
-                  <p className="text-sm">
-                    <Trans>
-                      While download sync will delete files not in the archive
-                      normally, it may fail to delete excluded files unless this
-                      is checked. Only active in Sync Mode. Only applies if
-                      there is a filter selection. Equivalent to
-                      --delete-excluded.
-                    </Trans>
-                  </p>
-                </HoverCardContent>
-              </HoverCard>
             </Label>
+            <HybridTooltip>
+              <HybridTooltipTrigger asChild>
+                <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors peer-disabled:opacity-70" />
+              </HybridTooltipTrigger>
+              <HybridTooltipContent className="w-80">
+                <p className="text-sm">
+                  <Trans>
+                    While download sync will delete files not in the archive
+                    normally, it may fail to delete excluded files unless this
+                    is checked. Only active in Sync Mode. Only applies if there
+                    is a filter selection. Equivalent to --delete-excluded.
+                  </Trans>
+                </p>
+              </HybridTooltipContent>
+            </HybridTooltip>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
@@ -160,24 +159,24 @@ export function AdvancedOptionsModal({
             />
             <Label
               htmlFor="trackRenames"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
               <Trans>Track Renames (Hash Strategy)</Trans>
-              <HoverCard>
-                <HoverCardTrigger asChild>
-                  <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" />
-                </HoverCardTrigger>
-                <HoverCardContent className="w-80">
-                  <p className="text-sm">
-                    <Trans>
-                      Avoid redownloading files by checking if they are renamed
-                      or moved. Only active in Sync Mode. --track-renames with
-                      hash strategy.
-                    </Trans>
-                  </p>
-                </HoverCardContent>
-              </HoverCard>
             </Label>
+            <HybridTooltip>
+              <HybridTooltipTrigger asChild>
+                <Info className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors peer-disabled:opacity-70" />
+              </HybridTooltipTrigger>
+              <HybridTooltipContent className="w-80">
+                <p className="text-sm">
+                  <Trans>
+                    Avoid redownloading files by checking if they are renamed or
+                    moved. Only active in Sync Mode. --track-renames with hash
+                    strategy.
+                  </Trans>
+                </p>
+              </HybridTooltipContent>
+            </HybridTooltip>
           </div>
         </div>
 
