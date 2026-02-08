@@ -1,4 +1,4 @@
-name: Build
+name: Build Release
 
 on:
   workflow_dispatch:
@@ -74,6 +74,8 @@ jobs:
       - uses: tauri-apps/tauri-action@063c0231f444e55760d98acb9c469b994269d4a5  # v1 (dev)
         id: tauri
         with:
-          uploadWorkflowArtifacts: true
+          tagName: v__VERSION__
+          releaseName: 'v__VERSION__'
+          releaseDraft: true
           args: ${{ matrix.args }}
           mobile: ${{ matrix.mobile || '' }}  # Android SDK is included in runner image (https://github.com/actions/runner-images/blob/39bd9125f9da70b40db3fcc04fe378ff2da8aecf/images/ubuntu/Ubuntu2404-Readme.md)
